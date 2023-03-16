@@ -747,7 +747,7 @@ define([
 
                     log.error('SO Save Failed', err);
 
-                    return writeError(context, 'Failed, but credit memo created');
+                    return writeError(context, 'Failed, SO could not be saved but credited on Neo');
                 }
 
                 if (!notBilled) {
