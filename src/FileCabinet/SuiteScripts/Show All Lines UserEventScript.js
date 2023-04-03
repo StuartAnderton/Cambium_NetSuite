@@ -4,7 +4,7 @@
  */
 define(['N/record'],
     /**
-     * @param{record} record
+
      */
     (record) => {
         /**
@@ -46,17 +46,17 @@ define(['N/record'],
 
             log.debug('Running on', thisRecord)
 
-            const lineCount= thisRecord.getLineCount({
+            const lineCount = thisRecord.getLineCount({
                 sublistId: 'item'
             })
 
             log.debug('Lines', lineCount)
 
-let foundvalue = thisRecord.findSublistLineWithValue({
-    sublistId: 'item',
-    fieldId: 'item',
-    value: 1204238
-})
+            let foundvalue = thisRecord.findSublistLineWithValue({
+                sublistId: 'item',
+                fieldId: 'item',
+                value: 1204238
+            })
             log.debug('Found', foundvalue)
 
 
@@ -85,12 +85,15 @@ let foundvalue = thisRecord.findSublistLineWithValue({
                     line: i
                 })
 
+
                 log.debug('Line contents line ' + i, [lineid, lineitem, linequantity, linenumber])
 
             }
 
+
+
         }
 
-        return { afterSubmit}
+        return {afterSubmit}
 
     });

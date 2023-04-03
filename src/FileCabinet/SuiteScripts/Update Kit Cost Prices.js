@@ -40,6 +40,18 @@ define(['N/record', 'N/search', 'N/runtime', 'N/format'],
                 formula: 'NS_CONCAT({memberitem.custitem_sup_external_id})'
             });
 
+            var kititemSearchColSupplierBundle = search.createColumn({
+                name: 'formulatext',
+                summary: search.Summary.MIN,
+                formula: 'NS_CONCAT(COALESCE({memberitem.custitem_bundle_rep}, \' \'))'
+            });
+
+            var kititemSearchColSupplierBundleCosts = search.createColumn({
+                name: 'formulatext',
+                summary: search.Summary.MIN,
+                formula: 'NS_CONCAT({memberitem.vendorcost})'
+            });
+
 
             var kititemSearch = search.create({
                 type: 'kititem',
@@ -50,7 +62,9 @@ define(['N/record', 'N/search', 'N/runtime', 'N/format'],
                     kititemSearchColInternalId,
                     kititemSearchColSumOfCostPrices,
                     kititemSearchColSuppliersArray,
-                    kititemSearchColSupplierIdArray
+                    kititemSearchColSupplierIdArray,
+                    kititemSearchColSupplierBundle,
+                    kititemSearchColSupplierBundleCosts
                 ],
             });
 
@@ -62,8 +76,11 @@ define(['N/record', 'N/search', 'N/runtime', 'N/format'],
                     var newSumOfKitPrices = result.getValue(kititemSearchColSumOfCostPrices);
                     var suppliersArray = result.getValue(kititemSearchColSuppliersArray).split(',')
                     var suppliersIdArray = result.getValue(kititemSearchColSupplierIdArray).split(',')
+                    var bundleIdArray = result.getValue(kititemSearchColSupplierBundle).split(',')
+                    var costsArray = result.getValue(kititemSearchColSupplierBundleCosts).split(',')
                     var supplier = '';
                     var supplierExternalId = '';
+
 
                     log.debug("Processing", result);
 
@@ -86,6 +103,12 @@ define(['N/record', 'N/search', 'N/runtime', 'N/format'],
                                 supplierExternalId = 'I7295191';
                                 break
                             }
+                        }
+                    }
+
+                    for ( j = 0; j < bundleIdArray.length; j++) {
+                        if (bundleIdArray[j] !== ' ') {
+                            newSumOfKitPrices = costsArray[j]
                         }
                     }
 

@@ -2,11 +2,11 @@
  * @NApiVersion 2.1
  * @NScriptType ScheduledScript
  */
-define(['N/task', 'N/runtime'],
+define(['N/task', 'N/runtime', 'N/file'],
     /**
- * @param{task} task
- */
-    (task, runtime) => {
+     * @param{task} task
+     */
+    (task, runtime, file) => {
 
         /**
          * Defines the Scheduled script trigger point.
@@ -17,8 +17,23 @@ define(['N/task', 'N/runtime'],
         const execute = (scriptContext) => {
 
             var scriptObj = runtime.getCurrentScript();
-            var searchId = scriptObj.getParameter({ name: "custscript_saved_search_int_id" });
-            var destinationPath = scriptObj.getParameter({ name: "custscript_destination_path" });
+            var searchId = scriptObj.getParameter({name: 'custscript_saved_search_int_id'});
+            var destinationPath = scriptObj.getParameter({name: 'custscript_destination_path'});
+
+            try {
+                var lastCSV = file.load({
+                    id: 'Uploaded to Shopify/Orders.csv'
+                })
+
+                var fileId = lastCSV.id
+
+                file.delete({
+                    id: fileId
+                })
+            } catch (err) {
+                log.audit('Error deleting previous CSV', err)
+            }
+
 
             var searchTask = task.create({
                 taskType: task.TaskType.SEARCH

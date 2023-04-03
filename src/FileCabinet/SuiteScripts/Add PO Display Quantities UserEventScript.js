@@ -10,7 +10,7 @@
  *
  *  Discounts are created so that the total on the PO accounts for the discount given and the dummy item.
  *
- *  The dummy item is receipted, so it does not appear on the PO as it goes to Waerlinx
+ *  On Approval, the dummy item is receipted, so it does not appear on the PO as it goes to Waerlinx
  *
  *  To allow for edits, a Before Submit resets all the display quantities and the After Submit then sets them to their correct values.
  *
@@ -20,7 +20,6 @@ define(['N/record', 'N/search', 'N/runtime'],
 
      */
     (record, search, runtime) => {
-
 
         const beforeSubmit = (scriptContext) => {
 
@@ -81,12 +80,16 @@ define(['N/record', 'N/search', 'N/runtime'],
 
             const newRecord = scriptContext.newRecord;
             const purchaseOrderId = newRecord.id;
-            var cumulativeValueChange = 0;
+            var cumulativeValueChangeStandardRate = 0;
+            var cumulativeValueChangeReducedRate = 0;
+            var cumulativeValueChangeZeroRate = 0;
 
             const scriptObj = runtime.getCurrentScript();
-            const discountItem = scriptObj.getParameter({name: 'custscript_bundles_discount_id'});
+            const discountItemStandardRate = scriptObj.getParameter({name: 'custscript_bundles_discount_id'});
+            const discountItemReducedRate = scriptObj.getParameter({name: 'custscript_bundles_discount_id_reduced'});
+            const discountItemZeroRate = scriptObj.getParameter({name: 'custscript_bundles_discount_id_zero'});
 
-            // do Search to find kit-representing components in PO
+            // do Search to find any kit-representing components in PO
 
             const purchaseorderSearchColItem = search.createColumn({name: 'item'});
             const purchaseorderSearchColDisplayName = search.createColumn({name: 'displayname', join: 'item'});
@@ -125,19 +128,12 @@ define(['N/record', 'N/search', 'N/runtime'],
 
                 log.debug('Found Kit representatives', [representsBundleInKit, kitQuantity])
 
-                // get list components of kit whose dummy has been found
+                // get list of components of kit whose dummy has been found, iterate through them looking for them in the PO
 
                 const sourceKit = record.load({
                     type: record.Type.KIT_ITEM,
                     id: representsBundleInKit
                 });
-
-                const kitCostPrice = sourceKit.getValue(
-                    {fieldId: 'custitem_cost_price_from_components'}
-                )
-
-                // note the value of the dummy kit component so it can be discounted off
-                cumulativeValueChange = cumulativeValueChange + (kitCostPrice * kitQuantity);
 
                 log.debug('Processing Kit', sourceKit)
 
@@ -186,27 +182,40 @@ define(['N/record', 'N/search', 'N/runtime'],
 
                         // If the item is the dummy item, receive it
 
-                        var initialQuantity = purchaseOrder.getSublistValue({
-                            sublistId: 'item',
-                            fieldId: 'quantity',
-                            line: lineToChange
-                        })
+                        if (purchaseOrder.getValue('approvalstatus') == 2) {
 
-                        var receivedQuantity = purchaseOrder.getSublistValue({
-                            sublistId: 'item',
-                            fieldId: 'quantityreceived',
-                            line: lineToChange
-                        })
+                            var initialQuantity = purchaseOrder.getSublistValue({
+                                sublistId: 'item',
+                                fieldId: 'quantity',
+                                line: lineToChange
+                            })
 
-                        const quantityToReceive = initialQuantity - receivedQuantity
+                            var receivedQuantity = purchaseOrder.getSublistValue({
+                                sublistId: 'item',
+                                fieldId: 'quantityreceived',
+                                line: lineToChange
+                            })
 
-                        log.debug('To recieve', [quantityToReceive, initialQuantity, receivedQuantity])
+                            const quantityToReceive = initialQuantity - receivedQuantity
 
-                        if (quantityToReceive > 0) {
+                            log.debug('To recieve', [quantityToReceive, initialQuantity, receivedQuantity])
 
-                            const itemReceipt = receiveItem(componentId, purchaseOrderId)
+                            if (quantityToReceive > 0) {
 
-                            log.debug('Received dummy item', itemReceipt)
+                                const itemReceipt = receiveItem(componentId, purchaseOrderId)
+
+                                log.debug('Received dummy item', itemReceipt)
+
+                                // reload PO as the act of receipting it changes it.
+
+                                purchaseOrder = record.load({
+                                    type: record.Type.PURCHASE_ORDER,
+                                    id: purchaseOrderId,
+                                    isDynamic: false
+                                })
+
+
+                            }
                         }
 
                     } else {
@@ -231,6 +240,12 @@ define(['N/record', 'N/search', 'N/runtime'],
                             line: lineToChange
                         })
 
+                        const taxCodeDisplay = purchaseOrder.getSublistValue({
+                            sublistId: 'item',
+                            fieldId: 'taxcode_display',
+                            line: lineToChange
+                        })
+
                         log.debug('Current Quantity ' + lineToChange, [componentId, lineItem, initialQuantity])
 
                         const quantityFromKit = componentQuantity * kitQuantity;
@@ -245,17 +260,34 @@ define(['N/record', 'N/search', 'N/runtime'],
 
                             newQuantity = 0
 
-                            var valueChange = initialQuantity * initialRate * -1;
+                            var valueChange = initialQuantity * initialRate;
 
                         } else {
 
-                            valueChange = quantityFromKit * initialRate * -1;
+                            valueChange = quantityFromKit * initialRate;
 
                         }
 
-                        // Track the cumulative value change we are creating
+                        // Track the cumulative value changes we are creating
 
-                        cumulativeValueChange = cumulativeValueChange + valueChange;
+                        if (taxCodeDisplay === 'VAT:S-GB') {
+
+                            cumulativeValueChangeStandardRate = cumulativeValueChangeStandardRate + valueChange;
+
+                            log.debug('Added to SR', valueChange)
+
+                        } else if ((taxCodeDisplay === 'VAT:R-GB')) {
+
+                            cumulativeValueChangeReducedRate = cumulativeValueChangeReducedRate + valueChange;
+
+                            log.debug('Added to RR', valueChange)
+
+                        } else {
+
+                            cumulativeValueChangeZeroRate = cumulativeValueChangeZeroRate + valueChange
+
+                            log.debug('Added to ZR', valueChange)
+                        }
 
                         purchaseOrder.setSublistValue({
                             sublistId: 'item',
@@ -283,9 +315,29 @@ define(['N/record', 'N/search', 'N/runtime'],
 
                 // Adjust values with discount
 
-                const discountLine = createDiscount(purchaseOrder, discountItem, cumulativeValueChange);
+                if (cumulativeValueChangeStandardRate > 0) {
 
-                log.debug('Discount created', [discountItem, discountLine, cumulativeValueChange])
+                    const discountLine = createDiscount(purchaseOrder, discountItemStandardRate, cumulativeValueChangeStandardRate);
+
+                    log.debug('Discount created', [discountItemStandardRate, cumulativeValueChangeStandardRate, discountLine])
+
+                }
+
+                if (cumulativeValueChangeReducedRate > 0) {
+
+                    const discountLine = createDiscount(purchaseOrder, discountItemReducedRate, cumulativeValueChangeReducedRate);
+
+                    log.debug('Discount created', [discountItemReducedRate, cumulativeValueChangeReducedRate, discountLine])
+
+                }
+
+                if (cumulativeValueChangeZeroRate > 0) {
+
+                    const discountLine = createDiscount(purchaseOrder, discountItemZeroRate, cumulativeValueChangeZeroRate);
+
+                    log.debug('Discount created', [discountItemZeroRate, cumulativeValueChangeZeroRate, discountLine])
+
+                }
 
                 purchaseOrder.save()
 
@@ -347,11 +399,7 @@ define(['N/record', 'N/search', 'N/runtime'],
 
         function createDiscount(purchaseOrder, discountItem, discountAmount) {
 
-/*             var purchaseOrder = record.load({
-                type: record.Type.PURCHASE_ORDER,
-                id: purchaseOrderId,
-                isDynamic: false
-            }) */
+            log.debug('Running discount add function', [purchaseOrder, discountItem, discountAmount])
 
             var discountLine = purchaseOrder.findSublistLineWithValue({
                 sublistId: 'item',
@@ -392,14 +440,14 @@ define(['N/record', 'N/search', 'N/runtime'],
                 sublistId: 'item',
                 fieldId: 'rate',
                 line: discountLine,
-                value: discountAmount
+                value: discountAmount * -1
             })
 
             purchaseOrder.setSublistValue({
                 sublistId: 'item',
                 fieldId: 'amount',
                 line: discountLine,
-                value: discountAmount
+                value: discountAmount * -1
             })
 
             return discountLine

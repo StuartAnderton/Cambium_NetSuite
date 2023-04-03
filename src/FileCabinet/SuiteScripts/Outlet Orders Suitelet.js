@@ -1,11 +1,13 @@
 /**
  * @NApiVersion 2.1
  * @NScriptType Suitelet
+ *
+ * Suitelet to process Shopify orders
+ *
  */
 define(['N/record', 'N/runtime', 'N/search', 'N/format'],
     /**
-     * @param{record} record
-     * @param{runtime} runtime
+
      */
     (record, runtime, search, format) => {
         /**
@@ -20,7 +22,6 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
             if (scriptContext.request.method === 'POST') {
 
                 log.debug('running', scriptContext.request.body)
-
 
                 var tho_company;
                 var fulfillment_co;
@@ -64,8 +65,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
 
                 var customerId = customerExists(order.customer);
 
-               customerId = createOrUpdateCustomer(order, tho_company, fulfillment_co, currency, customerId);
-
+                customerId = createOrUpdateCustomer(order, tho_company, fulfillment_co, currency, customerId);
 
                 // See if SO exists
 
@@ -96,6 +96,11 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                     var salesorderId = result[0].getValue({
                         name: 'internalid'
                     });
+
+                    if (order.type === 'cancel') {
+                        cancelSalesOrder(salesorderId);
+                        return
+                    }
 
                 }
 
@@ -142,13 +147,12 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                         value: locationId
                     })
 
-                    if(order.shipping > 0) {
+                    if (order.shipping > 0) {
 
-                    salesOrder.insertLine({
-                        sublistId: 'item',
-                        line: 0
-                    })
-
+                        salesOrder.insertLine({
+                            sublistId: 'item',
+                            line: 0
+                        })
 
 
                         salesOrder.setSublistValue({
@@ -187,12 +191,16 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                         })
                     }
                 } else {
+
+                    log.audit('SO already exists', salesorderId)
+
+                    return
                     //transaction record load
 
-                    salesOrder = record.load({
+/*                     salesOrder = record.load({
                         type: record.Type.SALES_ORDER,
                         id: salesorderId
-                    })
+                    }) */
                 }
 
                 // add lines
@@ -202,7 +210,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                 var quantities = order.quantity.split(',')
                 var amounts = order.amount.split(',')
 
-                for (var i = 0; i < ids.length; i++) {
+                for (let i = 0; i < ids.length; i++) {
 
                     salesOrder.insertLine({
                         sublistId: 'item',
@@ -217,15 +225,12 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                     })
 
 
-
-
                     salesOrder.setSublistValue({
                         sublistId: 'item',
                         fieldId: 'custcol_gross_amount_entry',
                         line: 0,
                         value: amounts[i]
                     })
-
 
 
                     salesOrder.setSublistValue({
@@ -308,6 +313,34 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
             return customerId
         }
 
+        function cancelSalesOrder(id) {
+
+            const salesOrder = record.load({
+                type: record.Type.SALES_ORDER,
+                id: id
+            })
+
+            const lineCount = salesOrder.getLineCount({
+                sublistId: 'item'
+            })
+
+            for (let i = 0; i < lineCount; i++) {
+
+                salesOrder.setSublistValue({
+                    sublistId: 'item',
+                    line: i,
+                    fieldId: 'quantity',
+                    value: 0
+                })
+            }
+
+            salesOrder.save()
+
+            log.audit('SO cancelled', id)
+
+
+        }
+
         function createOrUpdateCustomer(order, company, fulfillment_co, currency, customer_id) {
 
             if (customer_id === -1) {
@@ -321,7 +354,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                     isDynamic: false
                 })
             } else {
-                 customerRecord = record.load({
+                customerRecord = record.load({
                     type: record.Type.CUSTOMER,
                     id: customer_id,
                     isDynamic: false
@@ -386,12 +419,12 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                 value: order.phone
             })
 
-if (create) {
-    customerRecord.insertLine({
-        sublistId: 'addressbook',
-        line: 0
-    });
-}
+            if (create) {
+                customerRecord.insertLine({
+                    sublistId: 'addressbook',
+                    line: 0
+                });
+            }
 
             customerRecord.setSublistValue({
                 sublistId: 'addressbook',
@@ -434,7 +467,7 @@ if (create) {
 
             var newCustomerId = customerRecord.save()
 
-            if(create) {
+            if (create) {
 
                 var customerSubsidiary = record.create({
                     type: record.Type.CUSTOMER_SUBSIDIARY_RELATIONSHIP
