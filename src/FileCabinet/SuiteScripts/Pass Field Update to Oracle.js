@@ -7,6 +7,18 @@ define(['N/https', 'N/runtime'],
 
     function (https, runtime) {
 
+        /* function beforeSubmit(context) {
+
+            var isDeletion = context.type === context.UserEventType.DELETE
+
+            if (isDeletion) {
+
+                afterSubmit(context)
+
+                return
+            }
+        } */
+
         function afterSubmit(context) {
 
             var headers;
@@ -55,7 +67,8 @@ define(['N/https', 'N/runtime'],
                 // Payload
                 payload = {
                     EntityType: customRecordType,
-                    Id: customRecordId
+                    Id: customRecordId,
+                    EventType: context.type
                 };
 
                 log.debug("Payload", payload)
@@ -81,6 +94,7 @@ define(['N/https', 'N/runtime'],
 
 
         return {
+            // beforeSubmit: beforeSubmit,
             afterSubmit: afterSubmit
         };
 

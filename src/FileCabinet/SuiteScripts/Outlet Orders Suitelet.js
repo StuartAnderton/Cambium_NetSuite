@@ -98,7 +98,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                     });
 
                     if (order.type === 'cancel') {
-                        cancelSalesOrder(salesorderId);
+                        cancelSalesOrder(salesorderId, order.orderid);
                         return
                     }
 
@@ -139,7 +139,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
 
                     salesOrder.setValue({
                         fieldId: 'custbodysales_channel',
-                        value: 'THO'
+                        value: 'Cambium : The Homeware Outlet'
                     })
 
                     salesOrder.setValue({
@@ -224,20 +224,18 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                         text: items[i]
                     })
 
-
                     salesOrder.setSublistValue({
                         sublistId: 'item',
                         fieldId: 'custcol_gross_amount_entry',
                         line: 0,
-                        value: amounts[i]
+                        value: amounts[i] * quantities[i]
                     })
-
 
                     salesOrder.setSublistValue({
                         sublistId: 'item',
                         fieldId: 'amount',
                         line: 0,
-                        value: amounts[i]
+                        value: amounts[i] * quantities[i]
                     })
 
                     salesOrder.setSublistValue({
@@ -267,6 +265,18 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                 log.debug('Before Save', salesOrder)
 
                 var salesOrderSaved = salesOrder.save()
+
+                log.audit('SO created for ' + order.salesorder, salesOrderSaved)
+
+                var bill = record.transform({
+                    fromType: record.Type.SALES_ORDER,
+                    fromId: salesOrderSaved,
+                    toType: record.Type.INVOICE
+                })
+
+                var billId = bill.save()
+
+                log.audit(order.salesorder + ' Billed', billId)
 
             }
 
@@ -313,7 +323,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
             return customerId
         }
 
-        function cancelSalesOrder(id) {
+        function cancelSalesOrder(id, originatingSO) {
 
             const salesOrder = record.load({
                 type: record.Type.SALES_ORDER,
@@ -337,6 +347,42 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
             salesOrder.save()
 
             log.audit('SO cancelled', id)
+
+            const invoiceSearchColInternalId = search.createColumn({name: 'internalid'});
+            const invoiceSearch = search.create({
+                type: 'invoice',
+                filters: [
+                    ['custbody_shopify_order', 'is', originatingSO],
+                    'AND',
+                    ['mainline', 'is', 'T'],
+                ],
+                columns: [
+                    invoiceSearchColInternalId,
+                ],
+            });
+
+            var resultSet = invoiceSearch.run();
+
+            var result = resultSet.getRange({
+                start: 0,
+                end: 1
+            });
+
+            log.debug('Found bill', result)
+
+            var invoiceId = result[0].getValue({
+                name: 'internalid'
+            });
+
+            var creditMemo = record.transform({
+                fromType: record.Type.INVOICE,
+                fromId: invoiceId,
+                toType: record.Type.CREDIT_MEMO
+            })
+
+            var creditMemoId = creditMemo.save()
+
+            log.audit('Bill ' + invoiceId + ' Credited', creditMemoId)
 
 
         }
