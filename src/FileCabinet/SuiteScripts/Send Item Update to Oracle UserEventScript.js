@@ -41,7 +41,7 @@ define(['N/https', 'N/record', 'N/runtime', 'N/search'],
             // Searches which define the fields to send
             const recordSearchId = script.getParameter({name: 'custscript_item_search_2'});
             const recordSummarySearchId = script.getParameter({name: 'custscript_item_search_summary'});
-
+            const recordSummaryIsLines = script.getParameter({name: 'custscript_item_search_summary_lines'});
             // Flag field used by separate WF to retry any fails
             var flag = script.getParameter({name: 'custscript_sync_flag_item'})
 
@@ -67,7 +67,7 @@ define(['N/https', 'N/record', 'N/runtime', 'N/search'],
             });
 
             let searchResults = '';
-            let defaultFilters = [];
+            let defaultFilters = recordSearch.filters;
 
             defaultFilters.push(search.createFilter({
                 name: 'internalid',
@@ -86,7 +86,7 @@ define(['N/https', 'N/record', 'N/runtime', 'N/search'],
             log.debug('Results', recordData)
 
             if (!recordData) {
-                log.error('No Search Results', recordId)
+                log.audit('No Search Results', recordId)
                 return
             }
 
@@ -99,7 +99,7 @@ define(['N/https', 'N/record', 'N/runtime', 'N/search'],
                 });
 
                 let summarySearchResults = '';
-                let summaryDefaultFilters = [];
+                let summaryDefaultFilters = recordSummarySearch.filters;
 
                 summaryDefaultFilters.push(search.createFilter({
                     name: 'internalid',
@@ -113,11 +113,12 @@ define(['N/https', 'N/record', 'N/runtime', 'N/search'],
 
                 summarySearchResults = recordSummarySearch.run();
 
-                const recordSummaryData = summarySearchResults.getRange({start: 0, end: 1})[0];
+                var recordSummaryDataArray = summarySearchResults.getRange({start: 0, end: 1000});
 
-                log.debug('Summary Results', recordSummaryData)
 
-                if (!recordSummaryData) {
+                log.debug('Summary Results', recordSummaryDataArray)
+
+                if (!recordSummaryDataArray) {
                     log.error('No Summary Search Results', recordId)
                     return
                 }
@@ -125,12 +126,35 @@ define(['N/https', 'N/record', 'N/runtime', 'N/search'],
                 // merge the two results
 
                 let recordValues = recordData.toJSON().values;
-                let summaryRecordValues = recordSummaryData.toJSON().values
 
-                var mergedRecordValues = {
-                    ...recordValues,
-                    ...summaryRecordValues
-                };
+                var summaryRecordValues
+                var summaryRecordValuesArray = []
+                var mergedRecordValues
+
+                if (!recordSummaryIsLines) {
+
+                    summaryRecordValues = recordSummaryDataArray[0].toJSON().values
+
+                    mergedRecordValues = {
+                        ...recordValues,
+                        ...summaryRecordValues
+                    };
+
+                } else {
+                    for (var i = 0; i < recordSummaryDataArray.length; i++) {
+
+                        summaryRecordValuesArray.push(recordSummaryDataArray[i].toJSON().values)
+
+                    }
+                    log.debug('summaryRecordValuesArray', summaryRecordValuesArray)
+
+                    mergedRecordValues = recordValues
+
+                    mergedRecordValues['lines'] = summaryRecordValuesArray;
+
+                }
+
+
             } else {
                 mergedRecordValues = recordData.toJSON().values;
             }
@@ -172,6 +196,7 @@ define(['N/https', 'N/record', 'N/runtime', 'N/search'],
                 if (response.code == '200' || response.code == '204') {
                     log.audit('Record Update Sent', recordId);
                     if (flagset == true) {
+                        log.debug('Resetting flag as flagset == true', flagset)
                         setSyncFlag(recordId, recordType, flag, false)
                     }
 

@@ -167,6 +167,12 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
             })
 
             availableSublist.addField({
+                id: 'custpage_itemid_a',
+                label: 'NS ID',
+                type: ui.FieldType.INTEGER
+            })
+
+            availableSublist.addField({
                 id: 'custpage_item_a',
                 label: 'SKU',
                 type: ui.FieldType.TEXT
@@ -252,6 +258,12 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
                         value: twsBuyingStatus
                     });
 
+                    availableSublist.setSublistValue({
+                        id: 'custpage_itemid_a',
+                        line: counter,
+                        value: itemId
+                    });
+
                     counter = counter + 1;
 
                 });
@@ -276,6 +288,30 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
         }
 
         function onPost(context) {
+
+            var unavailable = context.request.parameters.custpage_unavail_items_in_townhousedata.split('\u0002')
+            log.debug('Unavailable', unavailable)
+            var available = context.request.parameters.custpage_avail_items_in_townhousedata.split('\u0002')
+            log.debug('Available', available)
+            var new_items = context.request.parameters.custpage_new_items_in_townhousedata.split('\u0002')
+            log.debug('New', new_items)
+
+            var recordsToChange = []
+
+            unavailable.forEach(function(line){
+                var lineFields = line.split('\u0001')
+
+            });
+
+            available.forEach(function(line){
+
+            });
+
+            new_items.forEach(function(line){
+
+            });
+
+
 
         }
 

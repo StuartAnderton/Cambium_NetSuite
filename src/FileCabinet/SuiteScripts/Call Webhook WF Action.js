@@ -5,14 +5,9 @@
 define(['N/https', 'N/runtime'],
     function(https, runtime) {
         function onAction(scriptContext) {
-            log.debug({
-                title: 'Start Script'
-            });
             var newRecord = scriptContext.newRecord;
             var jsonRecord = JSON.stringify(newRecord);
-            log.debug({
-                title: jsonRecord
-            });
+            log.debug('Processing', jsonRecord);
             var zapier = runtime.getCurrentScript().getParameter('custscript_new_zapier_endpoint');
             var headers=[];
             headers['Content-Type']='application/json';
@@ -20,12 +15,8 @@ define(['N/https', 'N/runtime'],
                 url: zapier,
                 body: jsonRecord,
                 headers: headers
-
             });
-
-
-
-
+            log.debug('Response', response)
             return response;
         }
         return {
