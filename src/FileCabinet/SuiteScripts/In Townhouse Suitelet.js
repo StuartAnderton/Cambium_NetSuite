@@ -2,11 +2,11 @@
  * @NApiVersion 2.1
  * @NScriptType Suitelet
  */
-define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
+define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url', 'N/runtime'],
     /**
 
      */
-    (log, record, ui, search) => {
+    (log, record, ui, search, task, url, runtime) => {
         /**
          * Defines the Suitelet script trigger point.
          * @param {Object} scriptContext
@@ -34,6 +34,23 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
 
             const form = ui.createForm({title: 'Manage Items in Townhouse'});
 
+            var htmlHeader = form.addField({
+                id: 'custpage_header',
+                type: ui.FieldType.INLINEHTML,
+                label: ' '
+            }).updateLayoutType({
+                layoutType: ui.FieldLayoutType.OUTSIDEABOVE
+            }).updateBreakType({
+                breakType: ui.FieldBreakType.STARTROW
+            }).defaultValue = `
+                <p style=\'font-size:14px;padding-left: 10px;\'>This page allows you to add or remove Items from the Townhouse.</p>
+                <p style=\'font-size:14px;padding-left: 10px;\'>Check the box against Items you wish to remove.</p>
+                <p style=\'font-size:14px;padding-left: 10px;\'>Discontinued Items are pre-selected for removal - clear the checkbox if you want to keep them.</p>
+                <p style=\'font-size:14px;padding-left: 10px;\'>You can add new Items on the Add New Items tab.</p>
+                <p style=\'font-size:14px;padding-left: 10px;\'>Note that when you click the button to make the changes, they may take a few moments to process.</p>
+                <br>
+                <br>`;
+
             form.addSubmitButton({label: 'Remove Selected & Add New'});
 
             form.addTab({
@@ -42,11 +59,10 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
             })
 
 
-
             const unavailableSublist = form.addSublist({
                 id: 'custpage_unavail_items_in_townhouse',
                 type: ui.SublistType.LIST,
-                label: 'Unavailable Items',
+                label: 'Discontinued Items',
                 tab: 'itemstab'
             });
 
@@ -55,6 +71,16 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
                 label: 'Remove',
                 type: ui.FieldType.CHECKBOX
             })
+
+            const unavailIdField = unavailableSublist.addField({
+                id: 'custpage_itemid_u',
+                label: 'NS ID',
+                type: ui.FieldType.INTEGER
+            })
+
+            unavailIdField.updateDisplayType({
+                displayType: ui.FieldDisplayType.HIDDEN
+            });
 
             unavailableSublist.addField({
                 id: 'custpage_item',
@@ -80,9 +106,23 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
                 type: ui.FieldType.TEXT
             })
 
+            unavailableSublist.addField({
+                id: 'custpage_mpn',
+                label: 'MPN',
+                type: ui.FieldType.TEXT
+            })
+
+            unavailableSublist.addField({
+                id: 'custpage_upc',
+                label: 'EAN/UPC',
+                type: ui.FieldType.TEXT
+            })
+
             const inventoryitemSearchColInTwsTownhouse = search.createColumn({name: 'custitemin_townhouse'});
             const inventoryitemSearchColName = search.createColumn({name: 'itemid'});
             const inventoryitemSearchId = search.createColumn({name: 'internalid'});
+            const inventoryitemSearchColUpc = search.createColumn({name: 'upccode'});
+            const inventoryitemSearchColMpn = search.createColumn({name: 'mpn'});
             const inventoryitemSearchColBrand = search.createColumn({name: 'custitem_brand', sort: search.Sort.ASC});
             const inventoryitemSearchColDisplayName = search.createColumn({name: 'displayname', sort: search.Sort.ASC});
             const inventoryitemSearchColTwsBuyingStatus = search.createColumn({
@@ -96,7 +136,7 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
                     'AND',
                     ['custitemin_townhouse', 'is', 'T'],
                     'AND',
-                    ['custitembuying_status_tws', 'noneof', '1'],
+                    ['custitembuying_status_tws', 'is', '5'],
                 ],
                 columns: [
                     inventoryitemSearchColInTwsTownhouse,
@@ -104,6 +144,9 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
                     inventoryitemSearchColBrand,
                     inventoryitemSearchColDisplayName,
                     inventoryitemSearchColTwsBuyingStatus,
+                    inventoryitemSearchId,
+                    inventoryitemSearchColUpc,
+                    inventoryitemSearchColMpn
                 ],
             });
 
@@ -111,44 +154,76 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
             const inventoryitemSearchPagedData = inventoryitemSearch.runPaged({pageSize: 1000});
             for (let i = 0; i < inventoryitemSearchPagedData.pageRanges.length; i++) {
                 const inventoryitemSearchPage = inventoryitemSearchPagedData.fetch({index: i});
+                log.debug('Search page', inventoryitemSearchPage)
                 inventoryitemSearchPage.data.forEach(function (result) {
-                    const inTwsTownhouse = result.getValue(inventoryitemSearchColInTwsTownhouse);
-                    const name = result.getValue(inventoryitemSearchColName);
-                    const brand = result.getText(inventoryitemSearchColBrand);
-                    const displayName = result.getValue(inventoryitemSearchColDisplayName);
-                    const twsBuyingStatus = result.getText(inventoryitemSearchColTwsBuyingStatus);
 
-                    unavailableSublist.setSublistValue({
-                        id: 'custpage_remove',
-                        line: counter,
-                        value: 'T'
-                    });
+                        const inTwsTownhouse = result.getValue(inventoryitemSearchColInTwsTownhouse);
+                        const name = result.getValue(inventoryitemSearchColName);
+                        const brand = result.getText(inventoryitemSearchColBrand);
+                        const displayName = result.getValue(inventoryitemSearchColDisplayName);
+                        const twsBuyingStatus = result.getText(inventoryitemSearchColTwsBuyingStatus);
+                        const itemId = result.getText(inventoryitemSearchId);
+                        const mpn = result.getValue(inventoryitemSearchColMpn) || '';
+                        const upc = result.getValue(inventoryitemSearchColUpc) || '';
 
-                    unavailableSublist.setSublistValue({
-                        id: 'custpage_item',
-                        line: counter,
-                        value: name
-                    });
+                        log.debug('MPN', result)
 
-                    unavailableSublist.setSublistValue({
-                        id: 'custpage_brand',
-                        line: counter,
-                        value: brand
-                    });
 
-                    unavailableSublist.setSublistValue({
-                        id: 'custpage_displayname',
-                        line: counter,
-                        value: displayName
-                    });
+                        unavailableSublist.setSublistValue({
+                            id: 'custpage_remove',
+                            line: counter,
+                            value: 'F'
+                        });
 
-                    unavailableSublist.setSublistValue({
-                        id: 'custpage_status',
-                        line: counter,
-                        value: twsBuyingStatus
-                    });
+                        unavailableSublist.setSublistValue({
+                            id: 'custpage_item',
+                            line: counter,
+                            value: name
+                        });
 
-                    counter = counter + 1;
+                        unavailableSublist.setSublistValue({
+                            id: 'custpage_brand',
+                            line: counter,
+                            value: brand
+                        });
+
+                        unavailableSublist.setSublistValue({
+                            id: 'custpage_displayname',
+                            line: counter,
+                            value: displayName
+                        });
+
+                        unavailableSublist.setSublistValue({
+                            id: 'custpage_status',
+                            line: counter,
+                            value: twsBuyingStatus
+                        });
+
+                        unavailableSublist.setSublistValue({
+                            id: 'custpage_itemid_u',
+                            line: counter,
+                            value: itemId
+                        });
+
+                        if(mpn) {
+                            unavailableSublist.setSublistValue({
+                                id: 'custpage_mpn',
+                                line: counter,
+                                value: mpn
+                            });
+                        }
+
+
+if(upc) {
+    unavailableSublist.setSublistValue({
+        id: 'custpage_upc',
+        line: counter,
+        value: upc
+    });
+}
+
+                        counter = counter + 1;
+
 
                 });
             }
@@ -156,7 +231,7 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
             const availableSublist = form.addSublist({
                 id: 'custpage_avail_items_in_townhouse',
                 type: ui.SublistType.LIST,
-                label: 'Available Items',
+                label: 'Other Items',
                 tab: 'itemstab'
             });
 
@@ -166,11 +241,15 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
                 type: ui.FieldType.CHECKBOX
             })
 
-            availableSublist.addField({
+            const availIdField = availableSublist.addField({
                 id: 'custpage_itemid_a',
                 label: 'NS ID',
                 type: ui.FieldType.INTEGER
             })
+
+            availIdField.updateDisplayType({
+                displayType: ui.FieldDisplayType.HIDDEN
+            });
 
             availableSublist.addField({
                 id: 'custpage_item_a',
@@ -196,6 +275,18 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
                 type: ui.FieldType.TEXT
             })
 
+            availableSublist.addField({
+                id: 'custpage_mpn_a',
+                label: 'MPN',
+                type: ui.FieldType.TEXT
+            })
+
+            availableSublist.addField({
+                id: 'custpage_upc_a',
+                label: 'EAN/UPC',
+                type: ui.FieldType.TEXT
+            })
+
 
             const availInventoryitemSearch = search.create({
                 type: 'inventoryitem',
@@ -204,7 +295,7 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
                     'AND',
                     ['custitemin_townhouse', 'is', 'T'],
                     'AND',
-                    ['custitembuying_status_tws', 'is', '1'],
+                    ['custitembuying_status_tws', 'noneof', '5'],
                 ],
                 columns: [
                     inventoryitemSearchColInTwsTownhouse,
@@ -212,7 +303,9 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
                     inventoryitemSearchColBrand,
                     inventoryitemSearchColDisplayName,
                     inventoryitemSearchColTwsBuyingStatus,
-                    inventoryitemSearchId
+                    inventoryitemSearchId,
+                    inventoryitemSearchColUpc,
+                    inventoryitemSearchColMpn
                 ],
             });
 
@@ -227,6 +320,9 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
                     const displayName = result.getValue(inventoryitemSearchColDisplayName);
                     const twsBuyingStatus = result.getText(inventoryitemSearchColTwsBuyingStatus);
                     const itemId = result.getValue(inventoryitemSearchId);
+                    const mpn = result.getValue(inventoryitemSearchColMpn)||'';
+                    const upc = result.getValue(inventoryitemSearchColUpc)||'';
+
 
                     availableSublist.setSublistValue({
                         id: 'custpage_remove_a',
@@ -264,6 +360,22 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
                         value: itemId
                     });
 
+                    if(upc) {
+                        availableSublist.setSublistValue({
+                            id: 'custpage_upc_a',
+                            line: counter,
+                            value: upc
+                        });
+                    }
+
+                    if (mpn) {
+                        availableSublist.setSublistValue({
+                            id: 'custpage_mpn_a',
+                            line: counter,
+                            value: mpn
+                        });
+                    }
+
                     counter = counter + 1;
 
                 });
@@ -289,29 +401,124 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search'],
 
         function onPost(context) {
 
-            var unavailable = context.request.parameters.custpage_unavail_items_in_townhousedata.split('\u0002')
+            if (context.request.parameters.custpage_unavail_items_in_townhousedata) {
+                var unavailable = context.request.parameters.custpage_unavail_items_in_townhousedata.split('\u0002')
+            } else {
+                unavailable = []
+            }
             log.debug('Unavailable', unavailable)
-            var available = context.request.parameters.custpage_avail_items_in_townhousedata.split('\u0002')
+
+            if (context.request.parameters.custpage_avail_items_in_townhousedata) {
+                var available = context.request.parameters.custpage_avail_items_in_townhousedata.split('\u0002')
+            } else {
+                available = []
+            }
             log.debug('Available', available)
-            var new_items = context.request.parameters.custpage_new_items_in_townhousedata.split('\u0002')
+
+            if (context.request.parameters.custpage_new_items_in_townhousedata) {
+                var new_items = context.request.parameters.custpage_new_items_in_townhousedata.split('\u0002')
+            } else {
+                new_items = []
+            }
             log.debug('New', new_items)
 
             var recordsToChange = []
 
-            unavailable.forEach(function(line){
-                var lineFields = line.split('\u0001')
+
+            unavailable.forEach(function (line) {
+                const lineFields = line.split('\u0001')
+
+                if (lineFields[0] === 'T') {
+
+                    recordsToChange.push(lineFields[1])
+
+                }
 
             });
 
-            available.forEach(function(line){
+
+            available.forEach(function (line) {
+
+                const lineFields = line.split('\u0001')
+
+                if (lineFields[0] === 'T') {
+
+                    recordsToChange.push(lineFields[1])
+
+                }
 
             });
 
-            new_items.forEach(function(line){
+            log.debug('To unset', recordsToChange)
+
+            if(recordsToChange) {
+
+                let mrTask = task.create({
+                    taskType: task.TaskType.MAP_REDUCE,
+                    scriptId: 'customscript_remove_townhouse',
+                    deploymentId: 'customdeploy_remove_townhouse',
+                    params: {custscript_townhouse_param: recordsToChange}
+                });
+
+                // Submit the map/reduce task
+                let mrTaskId = mrTask.submit();
+
+                let taskStatus = task.checkStatus({
+                    taskId: mrTaskId
+                });
+
+                log.debug('Submitted', [mrTaskId, taskStatus])
+            }
+
+
+            new_items.forEach(function (line) {
+
+                const itemId = line.split('\u0001')[1]
+
+                if (itemId) {
+
+                    const addItem = record.load({
+                            type: record.Type.INVENTORY_ITEM,
+                            id: itemId
+                        }
+                    )
+
+                    addItem.setValue({
+                        fieldId: 'custitemin_townhouse',
+                        value: true
+                    })
+
+                    addItem.save()
+
+                    log.audit('Set to TRUE', itemId)
+                }
 
             });
 
 
+            let responsePage =
+                `
+                <body style="font-family:Open Sans,Helvetica,sans-serif;">
+                <h1>Your changes are being processed</h1>
+
+<p></p>
+                It may take a few moments for the results to show,
+                as the changes are done in the background.
+                <p></p>
+
+                `
+
+            var forLink = url.resolveScript({
+                scriptId: 'customscript_in_townhouse',
+                deploymentId: 'customdeploy_in_townhouse_page',
+                returnExternalUrl: true
+            });
+
+            responsePage = responsePage +
+                '<A href="' + forLink + '">Reload page</A></body>'
+
+
+            context.response.write(responsePage);
 
         }
 

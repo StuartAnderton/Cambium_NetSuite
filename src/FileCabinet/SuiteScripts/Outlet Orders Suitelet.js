@@ -148,6 +148,8 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
             var customerId = customerExists(order.customer);
             var salesOrderExists = checkSalesOrderExists(order.orderid)
 
+
+
             if (salesOrderExists === -1) {
 
                 // New SO
@@ -157,6 +159,8 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
 
                 // Create SO
 
+                var salesorderName = order.salesorder.replace('#', '')
+
                 var salesOrder = record.create({
                     type: record.Type.SALES_ORDER,
                     isDynamic: false
@@ -164,12 +168,12 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
 
                 salesOrder.setValue({
                     fieldId: 'externalid',
-                    value: order.salesorder
+                    value: salesorderName
                 })
 
                 salesOrder.setValue({
                     fieldId: 'tranid',
-                    value: order.salesorder
+                    value: salesorderName
                 })
 
                 salesOrder.setValue({
@@ -198,7 +202,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                 })
 
                 // days variable is offset from order to pick
-                const days = 1;
+                const days = 0;
                 var newDate = new Date(Date.now() + days * 24*60*60*1000);
 
                 var newDateString = format.format({
