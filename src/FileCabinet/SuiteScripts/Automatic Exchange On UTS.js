@@ -11,10 +11,10 @@
  * Process a maximum of 4000 sales order lines per run
  */
 
-define(['N/record', 'N/search', 'N/runtime', 'N/crypto', 'N/https'],
+define(['N/record', 'N/search', 'N/runtime', 'N/crypto', 'N/https', 'N/format'],
 
 
-    function (record, search, runtime, crypto, https) {
+    function (record, search, runtime, crypto, https, format) {
 
 
         function execute(scriptContext) {
@@ -433,9 +433,14 @@ define(['N/record', 'N/search', 'N/runtime', 'N/crypto', 'N/https'],
 
             var today = new Date();
 
+            var formattedDateString = format.format({
+                value: today,
+                type: format.Type.DATETIMETZ
+            });
+
             note.setValue({
                 fieldId: 'custrecord_cn_date_added',
-                value: today
+                value: formattedDateString
             });
 
             note.setValue({

@@ -11,10 +11,10 @@
  * Process a maximum of 4000 sales order lines per run
  */
 
-define(['N/record', 'N/search', 'N/runtime', 'N/crypto', 'N/https'],
+define(['N/record', 'N/search', 'N/runtime', 'N/crypto', 'N/https', 'N/format'],
 
 
-    function (record, search, runtime, crypto, https) {
+    function (record, search, runtime, crypto, https, format) {
 
 
         function execute(scriptContext) {
@@ -117,9 +117,9 @@ define(['N/record', 'N/search', 'N/runtime', 'N/crypto', 'N/https'],
 
             //salesOrderSearchResults.each(function (result) {
 
-            var i = 0;
+            var i  = 0;
 
-            while (i < rangeToProcess.length) {
+            while ( i < rangeToProcess.length) {
 
                 var result = rangeToProcess[i];
 
@@ -221,7 +221,8 @@ define(['N/record', 'N/search', 'N/runtime', 'N/crypto', 'N/https'],
                     var itemPayload = {
                         'OrderDetailId': parseInt(originatingListPurchase),
                         'QuantityToCredit': quantityToCredit,
-                        'Amount': amountToCredit
+                        'Amount': amountToCredit,
+                        'QuantityRemaining': qtyRemaining
                     };
 
                     //log.debug('Pushing', itemPayload)
@@ -432,9 +433,14 @@ define(['N/record', 'N/search', 'N/runtime', 'N/crypto', 'N/https'],
 
             var today = new Date();
 
+            var formattedDateString = format.format({
+                value: today,
+                type: format.Type.DATE
+            });
+
             note.setValue({
                 fieldId: 'custrecord_cn_date_added',
-                value: today
+                value: formattedDateString
             });
 
             note.setValue({
@@ -545,13 +551,16 @@ define(['N/record', 'N/search', 'N/runtime', 'N/crypto', 'N/https'],
                 };
 
                 // Endpoint
-                url = 'https://' + cmsPrefix + 'azurewebsites.net/api/netsuite/CreditSalesOrdersBatch';
+                url = 'https://' + cmsPrefix + 'azurewebsites.net/api/netsuite/CreditSalesOrdersBatch?code=EFfNTwxgFJHXRki6943t9SKzfQONVHrpScO7dD3GTXX6jy5a2byMIQ==';
 
                 response = https.post({
                     url: url,
                     headers: headers,
                     body: JSON.stringify(payload)
                 });
+
+                log.audit('Batch url', url);
+                log.audit('Batch response', response);
 
                 if (response.code == '200') {
                     log.audit('Batch exchanged, credit applied', payload);
@@ -573,6 +582,7 @@ define(['N/record', 'N/search', 'N/runtime', 'N/crypto', 'N/https'],
                 id: salesOrderId
             });
 
+
             if (originatingListPurchase == '0') {
                 var soLine = salesOrder.findSublistLineWithValue({
                     sublistId: 'item',
@@ -586,6 +596,7 @@ define(['N/record', 'N/search', 'N/runtime', 'N/crypto', 'N/https'],
                     value: originatingListPurchase
                 });
             }
+
             salesOrder.setSublistValue({
                 sublistId: 'item',
                 fieldId: 'quantity',
@@ -675,15 +686,15 @@ define(['N/record', 'N/search', 'N/runtime', 'N/crypto', 'N/https'],
         }
 
         function getPrefix(runtime, isPrezola, isProduction) {
-            if (isProduction) {
-                if (isPrezola) {
+            if(isProduction){
+                if(isPrezola){
                     return getCompanyParameter(runtime, 'custscript_pza_prod_prefix');
                 }
 
                 return getCompanyParameter(runtime, 'custscript_neo_prod_prefix');
             }
 
-            if (isPrezola) {
+            if(isPrezola){
                 return getCompanyParameter(runtime, 'custscript_pza_qa_prefix');
             }
 
@@ -694,7 +705,7 @@ define(['N/record', 'N/search', 'N/runtime', 'N/crypto', 'N/https'],
             var script = runtime.getCurrentScript();
             var value = script.getParameter({name: parameter})
 
-            if (value == null)
+            if(value == null)
                 return '';
 
             return value;

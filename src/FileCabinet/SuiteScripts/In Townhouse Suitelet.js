@@ -62,7 +62,7 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
             const unavailableSublist = form.addSublist({
                 id: 'custpage_unavail_items_in_townhouse',
                 type: ui.SublistType.LIST,
-                label: 'Discontinued Items',
+                label: 'Discontinued/Deranged Items',
                 tab: 'itemstab'
             });
 
@@ -118,6 +118,12 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
                 type: ui.FieldType.TEXT
             })
 
+            unavailableSublist.addField({
+                id: 'custpage_reason',
+                label: 'Reason',
+                type: ui.FieldType.TEXT
+            })
+
             const inventoryitemSearchColInTwsTownhouse = search.createColumn({name: 'custitemin_townhouse'});
             const inventoryitemSearchColName = search.createColumn({name: 'itemid'});
             const inventoryitemSearchId = search.createColumn({name: 'internalid'});
@@ -129,6 +135,8 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
                 name: 'custitembuying_status_tws',
                 sort: search.Sort.ASC
             });
+            const inventoryitemSearchColReason = search.createColumn({name: 'custitemdiscontinuation_reason'});
+
             const inventoryitemSearch = search.create({
                 type: 'inventoryitem',
                 filters: [
@@ -146,7 +154,8 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
                     inventoryitemSearchColTwsBuyingStatus,
                     inventoryitemSearchId,
                     inventoryitemSearchColUpc,
-                    inventoryitemSearchColMpn
+                    inventoryitemSearchColMpn,
+                    inventoryitemSearchColReason
                 ],
             });
 
@@ -157,72 +166,80 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
                 log.debug('Search page', inventoryitemSearchPage)
                 inventoryitemSearchPage.data.forEach(function (result) {
 
-                        const inTwsTownhouse = result.getValue(inventoryitemSearchColInTwsTownhouse);
-                        const name = result.getValue(inventoryitemSearchColName);
-                        const brand = result.getText(inventoryitemSearchColBrand);
-                        const displayName = result.getValue(inventoryitemSearchColDisplayName);
-                        const twsBuyingStatus = result.getText(inventoryitemSearchColTwsBuyingStatus);
-                        const itemId = result.getText(inventoryitemSearchId);
-                        const mpn = result.getValue(inventoryitemSearchColMpn) || '';
-                        const upc = result.getValue(inventoryitemSearchColUpc) || '';
+                    const inTwsTownhouse = result.getValue(inventoryitemSearchColInTwsTownhouse);
+                    const name = result.getValue(inventoryitemSearchColName);
+                    const brand = result.getText(inventoryitemSearchColBrand);
+                    const displayName = result.getValue(inventoryitemSearchColDisplayName);
+                    const twsBuyingStatus = result.getText(inventoryitemSearchColTwsBuyingStatus);
+                    const itemId = result.getText(inventoryitemSearchId);
+                    const mpn = result.getValue(inventoryitemSearchColMpn) || '';
+                    const upc = result.getValue(inventoryitemSearchColUpc) || '';
+                    const reason = result.getText(inventoryitemSearchColReason);
 
-                        log.debug('MPN', result)
+                    log.debug('MPN', result)
 
 
-                        unavailableSublist.setSublistValue({
-                            id: 'custpage_remove',
-                            line: counter,
-                            value: 'F'
-                        });
+                    unavailableSublist.setSublistValue({
+                        id: 'custpage_remove',
+                        line: counter,
+                        value: 'F'
+                    });
 
-                        unavailableSublist.setSublistValue({
-                            id: 'custpage_item',
-                            line: counter,
-                            value: name
-                        });
+                    unavailableSublist.setSublistValue({
+                        id: 'custpage_item',
+                        line: counter,
+                        value: name
+                    });
 
-                        unavailableSublist.setSublistValue({
-                            id: 'custpage_brand',
-                            line: counter,
-                            value: brand
-                        });
-
-                        unavailableSublist.setSublistValue({
-                            id: 'custpage_displayname',
-                            line: counter,
-                            value: displayName
-                        });
-
-                        unavailableSublist.setSublistValue({
-                            id: 'custpage_status',
-                            line: counter,
-                            value: twsBuyingStatus
-                        });
-
-                        unavailableSublist.setSublistValue({
-                            id: 'custpage_itemid_u',
-                            line: counter,
-                            value: itemId
-                        });
-
-                        if(mpn) {
-                            unavailableSublist.setSublistValue({
-                                id: 'custpage_mpn',
-                                line: counter,
-                                value: mpn
-                            });
+                    if(reason) {unavailableSublist.setSublistValue({
+                        id: 'custpage_reason',
+                        line: counter,
+                        value: reason
+                    });
                         }
 
+                    unavailableSublist.setSublistValue({
+                        id: 'custpage_brand',
+                        line: counter,
+                        value: brand
+                    });
 
-if(upc) {
-    unavailableSublist.setSublistValue({
-        id: 'custpage_upc',
-        line: counter,
-        value: upc
-    });
-}
+                    unavailableSublist.setSublistValue({
+                        id: 'custpage_displayname',
+                        line: counter,
+                        value: displayName
+                    });
 
-                        counter = counter + 1;
+                    unavailableSublist.setSublistValue({
+                        id: 'custpage_status',
+                        line: counter,
+                        value: twsBuyingStatus
+                    });
+
+                    unavailableSublist.setSublistValue({
+                        id: 'custpage_itemid_u',
+                        line: counter,
+                        value: itemId
+                    });
+
+                    if(mpn) {
+                        unavailableSublist.setSublistValue({
+                            id: 'custpage_mpn',
+                            line: counter,
+                            value: mpn
+                        });
+                    }
+
+
+                    if(upc) {
+                        unavailableSublist.setSublistValue({
+                            id: 'custpage_upc',
+                            line: counter,
+                            value: upc
+                        });
+                    }
+
+                    counter = counter + 1;
 
 
                 });
@@ -287,6 +304,12 @@ if(upc) {
                 type: ui.FieldType.TEXT
             })
 
+            availableSublist.addField({
+                id: 'custpage_reason_a',
+                label: 'Disc Reason',
+                type: ui.FieldType.TEXT
+            })
+
 
             const availInventoryitemSearch = search.create({
                 type: 'inventoryitem',
@@ -305,7 +328,8 @@ if(upc) {
                     inventoryitemSearchColTwsBuyingStatus,
                     inventoryitemSearchId,
                     inventoryitemSearchColUpc,
-                    inventoryitemSearchColMpn
+                    inventoryitemSearchColMpn,
+                    inventoryitemSearchColReason
                 ],
             });
 
@@ -322,6 +346,7 @@ if(upc) {
                     const itemId = result.getValue(inventoryitemSearchId);
                     const mpn = result.getValue(inventoryitemSearchColMpn)||'';
                     const upc = result.getValue(inventoryitemSearchColUpc)||'';
+                    const reason = result.getText(inventoryitemSearchColReason)||'';
 
 
                     availableSublist.setSublistValue({
@@ -341,6 +366,14 @@ if(upc) {
                         line: counter,
                         value: brand
                     });
+
+                    if(reason) {
+                        availableSublist.setSublistValue({
+                            id: 'custpage_reason_a',
+                            line: counter,
+                            value: reason
+                        });
+                    }
 
                     availableSublist.setSublistValue({
                         id: 'custpage_displayname_a',

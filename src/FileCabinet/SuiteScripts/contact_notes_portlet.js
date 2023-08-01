@@ -22,11 +22,11 @@ define(['N/https', 'N/record', 'N/runtime', 'N/url', 'N/crypto', 'N/encode'],
                 returnExternalUrl: false
             });
 
-            
+
             // ****** Get data
-            
+
             // Get wishlist ID
-            
+
             var customer = record.load({
                 type: record.Type.CUSTOMER,
                 id: params.entity
@@ -44,17 +44,8 @@ define(['N/https', 'N/record', 'N/runtime', 'N/url', 'N/crypto', 'N/encode'],
 
             var isPrezola = owning_brand_id == 9;
 
-            if (runtime.envType === runtime.EnvType.PRODUCTION) {
-                if(isPrezola)
-                    cmsPrefix = '';
-                else
-                    cmsPrefix = 'neo-uk.'
-            } else {
-                if(isPrezola)
-                    cmsPrefix = 'matrix.';
-                else
-                    cmsPrefix = 'qa.';
-            }
+            var isProduction = runtime.envType === runtime.EnvType.PRODUCTION;
+            cmsPrefix = getPrefix(runtime, isPrezola, isProduction);
 
             // Check for PZA List
             var wishlist = '';
@@ -111,14 +102,14 @@ define(['N/https', 'N/record', 'N/runtime', 'N/url', 'N/crypto', 'N/encode'],
 
                 var hashObj = crypto.createHash({
                     algorithm: crypto.HashAlg.SHA256
-                   });
+                });
 
                 hashObj.update({
                     input: inputDate
                 });
 
                 var hashedValue = hashObj.digest().toLowerCase();
-                
+
                 if(owning_brand_id == 10)
                     cms_id = cms_id.substr(2, cms_id.length);
                 else
@@ -211,6 +202,33 @@ define(['N/https', 'N/record', 'N/runtime', 'N/url', 'N/crypto', 'N/encode'],
             }
 
             params.portlet.html = content;
+        }
+
+
+        function getPrefix(runtime, isPrezola, isProduction) {
+            if(isProduction){
+                if(isPrezola){
+                    return getCompanyParameter(runtime, 'custscript_pza_prod_prefix');
+                }
+
+                return getCompanyParameter(runtime, 'custscript_neo_prod_prefix');
+            }
+
+            if(isPrezola){
+                return getCompanyParameter(runtime, 'custscript_pza_qa_prefix');
+            }
+
+            return getCompanyParameter(runtime, 'custscript_neo_qa_prefix');
+        }
+
+        function getCompanyParameter(runtime, parameter) {
+            var script = runtime.getCurrentScript();
+            var value = script.getParameter({name: parameter})
+
+            if(value == null)
+                return '';
+
+            return value;
         }
 
         return {

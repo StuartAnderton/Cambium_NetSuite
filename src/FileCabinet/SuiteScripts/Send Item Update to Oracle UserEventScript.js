@@ -87,6 +87,11 @@ define(['N/https', 'N/record', 'N/runtime', 'N/search'],
 
             if (!recordData) {
                 log.audit('No Search Results', recordId)
+                if(newRecord.getValue(flag)) {
+                    log.audit('Clearing flag on no results', [recordId, newRecord.type, flag, false])
+                    setSyncFlag(recordId, newRecord.type, flag, false)
+                }
+
                 return
             }
 

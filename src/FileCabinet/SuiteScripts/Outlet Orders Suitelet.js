@@ -64,7 +64,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                     fulfillment_co = 1;
                     currency = 1;
                     locationId = 1;
- //                   shipping_nii = 1198861
+                    //                   shipping_nii = 1198861
                 }
 
                 var order = JSON.parse(scriptContext.request.body);
@@ -100,7 +100,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
             const existingSalesOrder = record.load({
                 type: record.Type.SALES_ORDER,
                 id: salesOrderId
-                })
+            })
 
             linesToRemove.forEach((line) => {
 
@@ -110,7 +110,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                     value: line
                 })
 
-                if(lineNumber != -1) {
+                if (lineNumber != -1) {
 
                     existingSalesOrder.setSublistValue({
                         sublistId: 'item',
@@ -132,7 +132,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
 
                 }
 
-                })
+            })
 
             existingSalesOrder.save()
 
@@ -147,7 +147,6 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
 
             var customerId = customerExists(order.customer);
             var salesOrderExists = checkSalesOrderExists(order.orderid)
-
 
 
             if (salesOrderExists === -1) {
@@ -172,7 +171,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                 })
 
                 salesOrder.setValue({
-                    fieldId: 'tranid',
+                    fieldId: 'custbody_shopify_order_name',
                     value: salesorderName
                 })
 
@@ -203,7 +202,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
 
                 // days variable is offset from order to pick
                 const days = 0;
-                var newDate = new Date(Date.now() + days * 24*60*60*1000);
+                var newDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
                 var newDateString = format.format({
                     value: newDate,
@@ -303,11 +302,37 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                     value: amounts[i] * quantities[i]
                 })
 
+                const itemSearchColTaxSchedule = search.createColumn({name: 'taxschedule'});
+                const itemSearch = search.create({
+                    type: 'item',
+                    filters: [
+                        ['externalidstring', 'is', items[i]],
+                    ],
+                    columns: [
+                        itemSearchColTaxSchedule,
+                    ],
+                });
+
+                var itemSearchResult = itemSearch.run().getRange({start: 0, end: 1})[0]
+                const taxSchedule = itemSearchResult.getText(itemSearchColTaxSchedule);
+
+                log.debug('Tax Schedule line ' + i, taxSchedule)
+                    var netamount = amounts[i] * quantities[i]
+                if (taxSchedule === 'S3') {
+                    var amount = (amounts[i] * quantities[i]) / 1.2
+                } else if (taxSchedule === 'S4') {
+                    amount = (amounts[i] * quantities[i]) / 1.05
+                } else {
+                    amount = (amounts[i] * quantities[i])
+                }
+
+                log.debug('Amount line ' + i, amount)
+
                 salesOrder.setSublistValue({
                     sublistId: 'item',
                     fieldId: 'amount',
                     line: 0,
-                    value: amounts[i] * quantities[i]
+                    value: amount
                 })
 
                 salesOrder.setSublistValue({
@@ -392,7 +417,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
 
             const id = checkSalesOrderExists(orderId)
 
-            if(id === -1) {
+            if (id === -1) {
                 log.audit('No SO to cancel', orderId)
                 return -1
             }
@@ -442,7 +467,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                 end: 1
             });
 
-            if (!result) {
+            if (!result[0]) {
                 log.audit('No bill found', orderId)
                 return 0
             }
@@ -528,7 +553,7 @@ define(['N/record', 'N/runtime', 'N/search', 'N/format'],
                         value: amount
                     })
 
-                    log.debug('Set line',[i, item, lineQuantity, amount])
+                    log.debug('Set line', [i, item, lineQuantity, amount])
 
                 }
             }

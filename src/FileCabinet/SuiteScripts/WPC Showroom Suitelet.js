@@ -118,6 +118,12 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
                 type: ui.FieldType.TEXT
             })
 
+            unavailableSublist.addField({
+                id: 'custpage_reason',
+                label: 'ReasonC',
+                type: ui.FieldType.TEXT
+            })
+
             const inventoryitemSearchColInTwsTownhouse = search.createColumn({name: 'custitem_in_wpc_showroom'});
             const inventoryitemSearchColName = search.createColumn({name: 'itemid'});
             const inventoryitemSearchId = search.createColumn({name: 'internalid'});
@@ -129,6 +135,8 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
                 name: 'custitembuying_status_wpc',
                 sort: search.Sort.ASC
             });
+            const inventoryitemSearchColReason = search.createColumn({name: 'custitemdiscontinuation_reason'});
+
             const inventoryitemSearch = search.create({
                 type: 'inventoryitem',
                 filters: [
@@ -146,7 +154,8 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
                     inventoryitemSearchColTwsBuyingStatus,
                     inventoryitemSearchId,
                     inventoryitemSearchColUpc,
-                    inventoryitemSearchColMpn
+                    inventoryitemSearchColMpn,
+                    inventoryitemSearchColReason
                 ],
             });
 
@@ -165,6 +174,7 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
                     const itemId = result.getText(inventoryitemSearchId);
                     const mpn = result.getValue(inventoryitemSearchColMpn) || '';
                     const upc = result.getValue(inventoryitemSearchColUpc) || '';
+                    const reason = result.getText(inventoryitemSearchColReason);
 
                     log.debug('MPN', result)
 
@@ -180,6 +190,14 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
                         line: counter,
                         value: name
                     });
+
+                    if(reason) {
+                        unavailableSublist.setSublistValue({
+                            id: 'custpage_reason',
+                            line: counter,
+                            value: reason
+                        });
+                    }
 
                     unavailableSublist.setSublistValue({
                         id: 'custpage_brand',
@@ -287,6 +305,12 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
                 type: ui.FieldType.TEXT
             })
 
+            availableSublist.addField({
+                id: 'custpage_reason_a',
+                label: 'Disc Reason',
+                type: ui.FieldType.TEXT
+            })
+
 
             const availInventoryitemSearch = search.create({
                 type: 'inventoryitem',
@@ -305,7 +329,8 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
                     inventoryitemSearchColTwsBuyingStatus,
                     inventoryitemSearchId,
                     inventoryitemSearchColUpc,
-                    inventoryitemSearchColMpn
+                    inventoryitemSearchColMpn,
+                    inventoryitemSearchColReason
                 ],
             });
 
@@ -322,6 +347,7 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
                     const itemId = result.getValue(inventoryitemSearchId);
                     const mpn = result.getValue(inventoryitemSearchColMpn) || '';
                     const upc = result.getValue(inventoryitemSearchColUpc) || '';
+                    const reason = result.getText(inventoryitemSearchColReason);
 
 
                     availableSublist.setSublistValue({
@@ -335,6 +361,14 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
                         line: counter,
                         value: name
                     });
+
+                    if(reason) {
+                        availableSublist.setSublistValue({
+                            id: 'custpage_reason_a',
+                            line: counter,
+                            value: reason
+                        });
+                    }
 
                     availableSublist.setSublistValue({
                         id: 'custpage_brand_a',
@@ -513,8 +547,8 @@ define(['N/log', 'N/record', 'N/ui/serverWidget', 'N/search', 'N/task', 'N/url',
                 `
 
             var forLink = url.resolveScript({
-                scriptId: 'customscript_showroom_manager',
-                deploymentId: 'customdeploy_showroom_manager',
+                scriptId: 'customscript_wpc_showroom',
+                deploymentId: 'customdeploy_wpc_showroom',
                 returnExternalUrl: true
             });
 

@@ -20,9 +20,18 @@ define(['N/file', 'N/runtime'],
 
             var fileToDelete = scriptObj.getParameter({name: 'custscript_file_to_delete'});
 
-            var fileObject = file.load({
-                id: fileToDelete
-            });
+            try {
+
+                var fileObject = file.load({
+                    id: fileToDelete
+                });
+
+            } catch(err) {
+
+                log.audit('Unable to load ' + fileToDelete, err)
+                return
+
+            }
 
             var fileId = fileObject.id
 
